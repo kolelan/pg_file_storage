@@ -19,6 +19,7 @@ docker-compose up -d
 - **pgAdmin:** admin@example.com / admin
 - **База данных:** admin / password
 - **Приложение:** admin / password (по умолчанию)
+![Как будет выглядеть вход в PgAdmin4](pg_screen.png)
 
 ## 📋 Компоненты системы
 
