@@ -16,6 +16,7 @@ require_once 'src/models/User.php';
 require_once 'src/models/FileManager.php';
 require_once 'src/controllers/AuthController.php';
 require_once 'src/controllers/FileController.php';
+require_once 'src/controllers/UserController.php';
 require_once 'src/utils/Router.php';
 require_once 'src/utils/Response.php';
 require_once 'src/utils/JWT.php';
@@ -75,9 +76,25 @@ $router->get('/admin/files', function() use ($db) {
     $controller->getAllFiles();
 });
 
-$router->get('/admin/users', function() use ($db) {
-    $controller = new AuthController($db);
+// Маршруты управления пользователями (только для админов)
+$router->get('/users', function() {
+    $controller = new UserController();
     $controller->getAllUsers();
+});
+
+$router->get('/users/(\d+)', function($userId) {
+    $controller = new UserController();
+    $controller->getUser($userId);
+});
+
+$router->put('/users/(\d+)/role', function($userId) {
+    $controller = new UserController();
+    $controller->updateUserRole($userId);
+});
+
+$router->delete('/users/(\d+)', function($userId) {
+    $controller = new UserController();
+    $controller->deleteUser($userId);
 });
 
 // Обработка запроса

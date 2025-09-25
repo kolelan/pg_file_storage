@@ -35,5 +35,13 @@ class Response {
     public static function validationError($errors) {
         self::error('Validation failed', 422, $errors);
     }
+
+    public static function badRequest($message = 'Bad Request') {
+        self::error($message, 400);
+    }
+
+    public static function internalServerError($message = 'Internal Server Error') {
+        self::error($message, 500);
+    }
 }
 ?>

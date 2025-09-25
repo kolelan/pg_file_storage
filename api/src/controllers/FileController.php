@@ -70,9 +70,11 @@ class FileController {
             Response::unauthorized('Invalid token');
         }
 
-        $files = $this->fileManager->getUserFiles($payload['user_id']);
+        // Получаем параметры из запроса
+        $options = $this->getRequestOptions();
+        $result = $this->fileManager->getUserFiles($payload['user_id'], false, $options);
 
-        Response::success(['files' => $files], 'Files retrieved successfully');
+        Response::success($result, 'Files retrieved successfully');
     }
 
     public function getAllFiles() {
@@ -86,9 +88,11 @@ class FileController {
             Response::forbidden('Admin access required');
         }
 
-        $files = $this->fileManager->getUserFiles(null, true);
+        // Получаем параметры из запроса
+        $options = $this->getRequestOptions();
+        $result = $this->fileManager->getUserFiles(null, true, $options);
 
-        Response::success(['files' => $files], 'All files retrieved successfully');
+        Response::success($result, 'All files retrieved successfully');
     }
 
     public function downloadFile($fileId) {
@@ -168,6 +172,24 @@ class FileController {
             $this->conn->rollBack();
             Response::error('Delete failed: ' . $e->getMessage(), 500);
         }
+    }
+
+    private function getRequestOptions() {
+        $options = [];
+
+        // Получаем параметры из GET запроса
+        $options['page'] = isset($_GET['page']) ? $_GET['page'] : 1;
+        $options['limit'] = isset($_GET['limit']) ? $_GET['limit'] : 10;
+        $options['sort_by'] = isset($_GET['sort_by']) ? $_GET['sort_by'] : 'created_at';
+        $options['sort_order'] = isset($_GET['sort_order']) ? $_GET['sort_order'] : 'DESC';
+        $options['search'] = isset($_GET['search']) ? $_GET['search'] : '';
+        $options['user_filter'] = isset($_GET['user_filter']) ? $_GET['user_filter'] : '';
+        $options['size_from'] = isset($_GET['size_from']) ? $_GET['size_from'] : null;
+        $options['size_to'] = isset($_GET['size_to']) ? $_GET['size_to'] : null;
+        $options['date_from'] = isset($_GET['date_from']) ? $_GET['date_from'] : '';
+        $options['date_to'] = isset($_GET['date_to']) ? $_GET['date_to'] : '';
+
+        return $options;
     }
 }
 ?>

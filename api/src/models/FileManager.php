@@ -135,23 +135,160 @@ class FileManager {
         $stmt->execute();
     }
 
-    public function getUserFiles($userId, $isAdmin = false) {
-        if($isAdmin) {
-            $query = "SELECT f.*, u.username FROM " . $this->table_name . " f 
-                     LEFT JOIN users u ON f.user_id = u.id 
-                     ORDER BY f.created_at DESC";
-        } else {
-            $query = "SELECT * FROM " . $this->table_name .
-                " WHERE user_id = :user_id ORDER BY created_at DESC";
+    public function getUserFiles($userId, $isAdmin = false, $options = []) {
+        $page = isset($options['page']) ? (int)$options['page'] : 1;
+        $limit = isset($options['limit']) ? (int)$options['limit'] : 10;
+        $sortBy = isset($options['sort_by']) ? $options['sort_by'] : 'created_at';
+        $sortOrder = isset($options['sort_order']) ? $options['sort_order'] : 'DESC';
+        $search = isset($options['search']) ? $options['search'] : '';
+        $userFilter = isset($options['user_filter']) ? $options['user_filter'] : '';
+        $sizeFrom = isset($options['size_from']) ? (int)$options['size_from'] : null;
+        $sizeTo = isset($options['size_to']) ? (int)$options['size_to'] : null;
+        $dateFrom = isset($options['date_from']) ? $options['date_from'] : '';
+        $dateTo = isset($options['date_to']) ? $options['date_to'] : '';
+
+        // Валидация параметров сортировки
+        $allowedSortFields = ['id', 'original_name', 'file_size', 'created_at', 'username'];
+        if (!in_array($sortBy, $allowedSortFields)) {
+            $sortBy = 'created_at';
+        }
+        if (!in_array(strtoupper($sortOrder), ['ASC', 'DESC'])) {
+            $sortOrder = 'DESC';
         }
 
+        $offset = ($page - 1) * $limit;
+
+        if($isAdmin) {
+            // Базовый запрос для админа
+            $query = "SELECT f.*, u.username FROM " . $this->table_name . " f 
+                     LEFT JOIN users u ON f.user_id = u.id";
+            $countQuery = "SELECT COUNT(*) FROM " . $this->table_name . " f 
+                          LEFT JOIN users u ON f.user_id = u.id";
+            
+            $conditions = [];
+            $params = [];
+
+            // Добавляем условия фильтрации
+            if (!empty($search)) {
+                $conditions[] = "(f.original_name ILIKE :search OR u.username ILIKE :search)";
+                $params[':search'] = '%' . $search . '%';
+            }
+
+            if (!empty($userFilter)) {
+                $conditions[] = "u.username ILIKE :user_filter";
+                $params[':user_filter'] = '%' . $userFilter . '%';
+            }
+
+            if ($sizeFrom !== null) {
+                $conditions[] = "f.file_size >= :size_from";
+                $params[':size_from'] = $sizeFrom;
+            }
+
+            if ($sizeTo !== null) {
+                $conditions[] = "f.file_size <= :size_to";
+                $params[':size_to'] = $sizeTo;
+            }
+
+            if (!empty($dateFrom)) {
+                $conditions[] = "f.created_at >= :date_from";
+                $params[':date_from'] = $dateFrom;
+            }
+
+            if (!empty($dateTo)) {
+                $conditions[] = "f.created_at <= :date_to";
+                $params[':date_to'] = $dateTo;
+            }
+
+            if (!empty($conditions)) {
+                $whereClause = " WHERE " . implode(" AND ", $conditions);
+                $query .= $whereClause;
+                $countQuery .= $whereClause;
+            }
+
+            // Добавляем сортировку
+            $sortField = $sortBy === 'username' ? 'u.username' : 'f.' . $sortBy;
+            $query .= " ORDER BY " . $sortField . " " . $sortOrder;
+            
+            // Добавляем лимит и оффсет
+            $query .= " LIMIT :limit OFFSET :offset";
+            $params[':limit'] = $limit;
+            $params[':offset'] = $offset;
+
+        } else {
+            // Запрос для обычного пользователя
+            $query = "SELECT * FROM " . $this->table_name . " WHERE user_id = :user_id";
+            $countQuery = "SELECT COUNT(*) FROM " . $this->table_name . " WHERE user_id = :user_id";
+            $params = [':user_id' => $userId];
+
+            // Добавляем поиск по имени файла для пользователя
+            if (!empty($search)) {
+                $query .= " AND original_name ILIKE :search";
+                $countQuery .= " AND original_name ILIKE :search";
+                $params[':search'] = '%' . $search . '%';
+            }
+
+            // Фильтрация по размеру для пользователя
+            if ($sizeFrom !== null) {
+                $query .= " AND file_size >= :size_from";
+                $countQuery .= " AND file_size >= :size_from";
+                $params[':size_from'] = $sizeFrom;
+            }
+
+            if ($sizeTo !== null) {
+                $query .= " AND file_size <= :size_to";
+                $countQuery .= " AND file_size <= :size_to";
+                $params[':size_to'] = $sizeTo;
+            }
+
+            // Фильтрация по дате для пользователя
+            if (!empty($dateFrom)) {
+                $query .= " AND created_at >= :date_from";
+                $countQuery .= " AND created_at >= :date_from";
+                $params[':date_from'] = $dateFrom;
+            }
+
+            if (!empty($dateTo)) {
+                $query .= " AND created_at <= :date_to";
+                $countQuery .= " AND created_at <= :date_to";
+                $params[':date_to'] = $dateTo;
+            }
+
+            // Добавляем сортировку
+            $query .= " ORDER BY " . $sortBy . " " . $sortOrder;
+            
+            // Добавляем лимит и оффсет
+            $query .= " LIMIT :limit OFFSET :offset";
+            $params[':limit'] = $limit;
+            $params[':offset'] = $offset;
+        }
+
+        // Выполняем запрос для получения данных
         $stmt = $this->conn->prepare($query);
-        if(!$isAdmin) {
-            $stmt->bindParam(":user_id", $userId);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
         }
         $stmt->execute();
+        $files = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // Выполняем запрос для подсчета общего количества
+        $countStmt = $this->conn->prepare($countQuery);
+        foreach ($params as $key => $value) {
+            if ($key !== ':limit' && $key !== ':offset') {
+                $countStmt->bindValue($key, $value);
+            }
+        }
+        $countStmt->execute();
+        $totalCount = $countStmt->fetchColumn();
+
+        return [
+            'files' => $files,
+            'pagination' => [
+                'current_page' => $page,
+                'per_page' => $limit,
+                'total' => (int)$totalCount,
+                'total_pages' => ceil($totalCount / $limit)
+            ]
+        ];
     }
 }
 ?>
