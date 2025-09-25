@@ -1,0 +1,30 @@
+project/
+├── docker-compose.yml
+├── api/
+│   ├── docker/
+│   │   └── Dockerfile
+│   ├── src/
+│   │   ├── controllers/
+│   │   ├── models/
+│   │   ├── middleware/
+│   │   ├── config/
+│   │   └── index.php
+│   ├── composer.json
+│   └── .env
+├── frontend/
+│   ├── docker/
+│   │   └── Dockerfile
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   ├── services/
+│   │   └── App.js
+│   ├── package.json
+│   └── public/
+└── database/
+    ├── docker/
+    │   └── Dockerfile
+    ├── data/
+    │   └── init.sql
+    └── scripts/
+        └── init.sql
