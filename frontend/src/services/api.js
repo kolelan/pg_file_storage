@@ -38,6 +38,21 @@ class ApiService {
         });
         return response.json();
     }
+
+    static async downloadFile(fileId, token) {
+        const response = await fetch(`${API_BASE}/files/download/${fileId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return response;
+    }
+
+    static async deleteFile(fileId, token) {
+        const response = await fetch(`${API_BASE}/files/${fileId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        return response.json();
+    }
 }
 
 export default ApiService;

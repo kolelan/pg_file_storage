@@ -40,9 +40,34 @@ const FileList = ({ isAdmin = false }) => {
     return new Date(dateString).toLocaleString('ru-RU')
   }
 
-  const handleDownload = (file) => {
-    // Скачивание файла через API
-    window.open(`/api/files/download/${file.id}`, '_blank')
+  const handleDownload = async (file) => {
+    try {
+      const response = await ApiService.downloadFile(file.id, token)
+
+      if (response.ok) {
+        // Получаем blob данных
+        const blob = await response.blob()
+        
+        // Создаем URL для скачивания
+        const url = window.URL.createObjectURL(blob)
+        
+        // Создаем временную ссылку для скачивания
+        const link = document.createElement('a')
+        link.href = url
+        link.download = file.original_name
+        document.body.appendChild(link)
+        link.click()
+        
+        // Очищаем
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+      } else {
+        const error = await response.json()
+        setError(error.message || 'Ошибка скачивания файла')
+      }
+    } catch (error) {
+      setError('Ошибка соединения с сервером')
+    }
   }
 
   const handleDelete = async (fileId) => {
@@ -51,14 +76,7 @@ const FileList = ({ isAdmin = false }) => {
     }
 
     try {
-      const response = await fetch(`/api/files/${fileId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      
-      const result = await response.json()
+      const result = await ApiService.deleteFile(fileId, token)
       
       if (result.success) {
         // После удаления перезагружаем список

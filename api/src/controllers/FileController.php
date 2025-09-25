@@ -104,11 +104,19 @@ class FileController {
             Response::notFound('File not found or access denied');
         }
 
+        // Очищаем буфер вывода
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+
         // Устанавливаем заголовки для скачивания
         header('Content-Type: ' . $fileData['mime_type']);
         header('Content-Disposition: attachment; filename="' . $fileData['filename'] . '"');
         header('Content-Length: ' . strlen($fileData['content']));
+        header('Cache-Control: no-cache, must-revalidate');
+        header('Pragma: no-cache');
 
+        // Выводим содержимое файла
         echo $fileData['content'];
         exit();
     }

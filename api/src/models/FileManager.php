@@ -66,13 +66,56 @@ class FileManager {
             // Увеличение счетчика скачиваний
             $this->incrementDownloadCount($fileId);
 
-            // Чтение large object по частям
-            $stream = $this->conn->pgsqlLOBOpen($file['lo_oid'], 'r');
+            // Чтение large object
             $content = '';
-            while ($data = fread($stream, 8192)) {
-                $content .= $data;
+            
+            // Начинаем транзакцию для работы с Large Object
+            $this->conn->beginTransaction();
+            
+            try {
+                // Открываем Large Object
+                $result = $this->conn->query("SELECT lo_open({$file['lo_oid']}, 262144) as fd");
+                $fd = $result->fetch(PDO::FETCH_ASSOC)['fd'];
+                
+                if ($fd === false) {
+                    throw new Exception('Cannot open large object');
+                }
+                
+                // Читаем содержимое по частям
+                $chunkSize = 8192;
+                $totalSize = $file['file_size'];
+                $readBytes = 0;
+                
+                while ($readBytes < $totalSize) {
+                    $bytesToRead = min($chunkSize, $totalSize - $readBytes);
+                    $result = $this->conn->query("SELECT loread($fd, $bytesToRead) as data");
+                    $row = $result->fetch(PDO::FETCH_ASSOC);
+                    $data = $row['data'];
+                    
+                    if ($data === false || $data === null || $data === '') {
+                        break;
+                    }
+                    
+                    // Преобразуем resource в строку, если необходимо
+                    if (is_resource($data)) {
+                        $data = stream_get_contents($data);
+                    }
+                    
+                    $content .= $data;
+                    $readBytes += strlen($data);
+                }
+                
+                // Закрываем Large Object
+                $this->conn->query("SELECT lo_close($fd)");
+                
+                // Подтверждаем транзакцию
+                $this->conn->commit();
+                
+            } catch (Exception $e) {
+                // Откатываем транзакцию в случае ошибки
+                $this->conn->rollback();
+                throw $e;
             }
-            fclose($stream);
 
             return [
                 'content' => $content,
